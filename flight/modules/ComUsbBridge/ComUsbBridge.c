@@ -37,6 +37,7 @@
 
 #include <stdbool.h>
 
+#if defined(PIOS_INCLUDE_USB)
 // ****************
 // Private functions
 
@@ -124,7 +125,7 @@ static int32_t comUsbBridgeInitialize(void)
 
     return 0;
 }
-MODULE_INITCALL(comUsbBridgeInitialize, comUsbBridgeStart);
+
 
 /**
  * Main task. It does not return.
@@ -202,3 +203,4 @@ static void updateSettings(__attribute__((unused)) UAVObjEvent *ev)
         }
     }
 }
+#endif /* if defined(PIOS_INCLUDE_USB) */

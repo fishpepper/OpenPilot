@@ -113,7 +113,9 @@ static PiOSDeltatimeConfig dtconfig;
 static void AttitudeTask(void *parameters);
 
 static float gyro_correct_int[3] = { 0, 0, 0 };
+#if defined(PIOS_INCLUDE_ADC)
 static xQueueHandle gyro_queue;
+#endif
 
 static int32_t updateSensors(AccelStateData *, GyroStateData *);
 static int32_t updateSensorsCC3D(AccelStateData *accelStateData, GyroStateData *gyrosData);
@@ -168,7 +170,9 @@ static struct PIOS_SENSORS_3Axis_SensorsWithTemp *mpu6000_data = NULL;
 
 // Used to detect CC vs CC3D
 static const struct pios_board_info *bdinfo = &pios_board_info_blob;
-#define BOARDISCC3D (bdinfo->board_rev == 0x02)
+#define BOARDISCC3D  (bdinfo->board_rev == 0x02)
+#define BOARDISCJMCU (bdinfo->board_rev == 0x07)
+
 /**
  * Initialise the module, called on startup
  * \returns 0 on success or -1 if initialisation failed
@@ -241,14 +245,19 @@ static void AttitudeTask(__attribute__((unused)) void *parameters)
 
     AlarmsClear(SYSTEMALARMS_ALARM_ATTITUDE);
 
-    bool cc3d = BOARDISCC3D;
+    bool cc3d  = BOARDISCC3D;
+    bool cjmcu = BOARDISCJMCU;
 
     if (cc3d) {
 #if defined(PIOS_INCLUDE_MPU6000)
-
-        gyro_test    = PIOS_MPU6000_Driver.test(0);
+        // gyro_test    = PIOS_MPU6000_Driver.test(0);
         mpu6000_data = pios_malloc(sizeof(PIOS_SENSORS_3Axis_SensorsWithTemp) + sizeof(Vector3i16) * 2);
 #endif
+    } else if (cjmcu) {
+        #if defined(PIOS_INCLUDE_MPU6000)
+        #endif
+        mpu6000_data = pios_malloc(sizeof(PIOS_SENSORS_3Axis_SensorsWithTemp) + sizeof(Vector3i16) * 2);
+        // NOTHING YET
     } else {
 #if defined(PIOS_INCLUDE_ADXL345)
         // Set critical error and wait until the accel is producing data
@@ -322,9 +331,12 @@ static void AttitudeTask(__attribute__((unused)) void *parameters)
 
         if (cc3d) {
             retval = updateSensorsCC3D(&accelState, &gyros);
+        } else if (cjmcu) {
+            retval = updateSensorsCC3D(&accelState, &gyros);
         } else {
             retval = updateSensors(&accelState, &gyros);
         }
+
 
         // Only update attitude when sensor data is good
         if (retval != 0) {
@@ -350,6 +362,7 @@ static void AttitudeTask(__attribute__((unused)) void *parameters)
  */
 static int32_t updateSensors(AccelStateData *accelState, GyroStateData *gyros)
 {
+    #if defined(PIOS_INCLUDE_ADXL345)
     struct pios_adxl345_data accel_data;
     float gyro[4];
 
@@ -459,6 +472,19 @@ static int32_t updateSensors(AccelStateData *accelState, GyroStateData *gyros)
     AccelStateSet(accelState);
 
     return 0;
+
+    #else /* if defined(PIOS_INCLUDE_ADXL345) */
+
+    accelState->x = 0;
+    accelState->y = 0;
+    accelState->z = 0;
+
+    gyros->x = 0;
+    gyros->y = 0;
+    gyros->z = 0;
+    return 0;
+
+    #endif /* if defined(PIOS_INCLUDE_ADXL345) */
 }
 
 /**
@@ -473,8 +499,16 @@ static int32_t updateSensorsCC3D(AccelStateData *accelStateData, GyroStateData *
     float temp = 0;
     uint8_t count   = 0;
 
-#if defined(PIOS_INCLUDE_MPU6000)
+    #ifdef PIOS_MPU6000_INTERFACE_I2C
+    // MPU6000 ON CJMCU does not use interrupt pins... so call this to update the data
+    PIOS_MPU6000_IRQHandler();
+    // EVEN WITHOUT THIS SOMEHOW WE GET TWO TREADS ACCESSING THE I2c? wwdg watchdoh triggers
+    #endif
 
+    // FIXME
+    // return 0;
+
+#if defined(PIOS_INCLUDE_MPU6000)
     xQueueHandle queue = PIOS_MPU6000_Driver.get_queue(0);
     BaseType_t ret     = xQueueReceive(queue, (void *)mpu6000_data, sensor_period_ms);
     while (ret == pdTRUE) {
@@ -760,7 +794,7 @@ static void settingsUpdatedCb(__attribute__((unused)) UAVObjEvent *objEv)
     temp_calibrated_extent.min = accelGyroSettings.temp_calibrated_extent.min;
     temp_calibrated_extent.max = accelGyroSettings.temp_calibrated_extent.max;
 
-    if (BOARDISCC3D) {
+    if ((BOARDISCC3D) || (BOARDISCJMCU)) {
         float scales[2];
         PIOS_MPU6000_Driver.get_scale(scales, 2, 0);
         accel_bias.X  = accelGyroSettings.accel_bias.X;

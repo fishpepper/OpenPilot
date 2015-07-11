@@ -49,8 +49,12 @@ static TIM_TypeDef *pios_servo_bank_timer[PIOS_SERVO_BANKS] = { 0 };
 
 // index of bank used for each pin
 static uint8_t *pios_servo_pin_bank;
-
+#ifdef PIOS_SERVO_BRUSHED_MOTORS
+#define PIOS_SERVO_TIMER_CLOCK 8000000
+#else
 #define PIOS_SERVO_TIMER_CLOCK 1000000
+#endif
+
 #define PIOS_SERVO_SAFE_MARGIN 50
 /**
  * Initialise Servos
@@ -169,6 +173,18 @@ void PIOS_Servo_Set(uint8_t servo, uint16_t position)
     if (!servo_cfg || servo >= servo_cfg->num_channels) {
         return;
     }
+
+    #ifdef PIOS_SERVO_BRUSHED_MOTORS
+    // we rescale from 1000-2000 to 0..255 in order
+    // to be able to use the standard gcs software
+    // which does not allow settings < 500us
+    // 0 = 0%, 255 = 100% motor power for brushed motor control
+    if ((position >= 1000) && (position <= 20000)) {
+        position = ((position - 1000) * 255) / 1000;
+    } else {
+        position = 0;
+    }
+    #endif
 
 
     /* Update the position */

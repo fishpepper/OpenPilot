@@ -213,9 +213,10 @@ export OPUAVSYNTHDIR := $(BUILD_DIR)/uavobject-synthetics/flight
 export OPGCSSYNTHDIR := $(BUILD_DIR)/openpilotgcs-synthetics
 
 # Define supported board lists
-ALL_BOARDS    := coptercontrol oplinkmini revolution osd revoproto simposix discoveryf4bare gpsplatinum
+ALL_BOARDS    := cjmcu coptercontrol oplinkmini revolution osd revoproto simposix discoveryf4bare gpsplatinum
 
 # Short names of each board (used to display board name in parallel builds)
+cjmcu_short            := 'cjm '
 coptercontrol_short    := 'cc  '
 oplinkmini_short       := 'oplm'
 revolution_short       := 'revo'
@@ -814,7 +815,7 @@ define UNCRUSTIFY_TEMPLATE
 .PHONY: uncrustify_$(1)
 uncrustify_$(1):
 	@$(ECHO) "Auto-formatting $(1) source code"
-	$(V1) UNCRUSTIFY_CONFIG="$(ROOT_DIR)/make/uncrustify/uncrustify.cfg" $(SHELL) make/scripts/uncrustify.sh $(call toprel, $(2))
+	$(V1) UNCRUSTIFY_CONFIG="$(ROOT_DIR)/make/uncrustify/uncrustify.cfg" $(SHELL) $(ROOT_DIR)/make/scripts/uncrustify.sh $(call toprel, $(2))
 endef
 
 $(foreach uncrustify_targ, $(UNCRUSTIFY_TARGETS), $(eval $(call UNCRUSTIFY_TEMPLATE,$(uncrustify_targ),$(ROOT_DIR)/$(uncrustify_targ))))

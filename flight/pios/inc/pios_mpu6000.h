@@ -33,6 +33,8 @@
 #define PIOS_MPU6000_H
 #include <pios_sensors.h>
 
+#define PIOS_MPU6000_I2C_ADDR                 0x68
+
 /* MPU6000 Addresses */
 #define PIOS_MPU6000_SMPLRT_DIV_REG           0X19
 #define PIOS_MPU6000_DLPF_CFG_REG             0X1A
@@ -148,8 +150,10 @@ struct pios_mpu6000_cfg {
     enum pios_mpu6000_range gyro_range;
     enum pios_mpu6000_filter filter;
     enum pios_mpu6000_orientation orientation;
+#if defined(PIOS_INCLUDE_SPI)
     SPIPrescalerTypeDef fast_prescaler;
     SPIPrescalerTypeDef std_prescaler;
+#endif
     uint8_t max_downsample;
 };
 

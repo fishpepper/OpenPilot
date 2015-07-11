@@ -229,7 +229,9 @@ int32_t GPSInitialize(void)
     return -1;
 }
 
+#if defined(PIOS_INCLUDE_GPS)
 MODULE_INITCALL(GPSInitialize, GPSStart);
+#endif
 
 // ****************
 /**

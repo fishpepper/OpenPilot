@@ -66,10 +66,15 @@ static int8_t counter;
 #define MAX_MIX_ACTUATORS               ACTUATORCOMMAND_CHANNEL_NUMELEM
 
 #define CAMERA_BOOT_DELAY_MS            7000
-
+#ifdef PIOS_SERVO_BRUSHED_MOTORS
+#define ACTUATOR_ONESHOT125_CLOCK       8000000
+#define ACTUATOR_ONESHOT125_PULSE_SCALE 4
+#define ACTUATOR_PWM_CLOCK              4000000
+#else
 #define ACTUATOR_ONESHOT125_CLOCK       2000000
 #define ACTUATOR_ONESHOT125_PULSE_SCALE 4
 #define ACTUATOR_PWM_CLOCK              1000000
+#endif
 // Private types
 
 
@@ -772,8 +777,9 @@ static bool set_channel(uint8_t mixer_channel, uint16_t value, const ActuatorSet
  */
 static void actuator_update_rate_if_changed(const ActuatorSettingsData *actuatorSettings, bool force_update)
 {
+    #define MAX_BANKS (((ACTUATORSETTINGS_BANKMODE_NUMELEM) < (PIOS_SERVO_BANKS)) ? (ACTUATORSETTINGS_BANKMODE_NUMELEM) : (PIOS_SERVO_BANKS))
     static uint16_t prevBankUpdateFreq[ACTUATORSETTINGS_BANKUPDATEFREQ_NUMELEM];
-    static uint8_t prevBankMode[ACTUATORSETTINGS_BANKMODE_NUMELEM];
+    static uint8_t prevBankMode[MAX_BANKS];
     bool updateMode = force_update || (memcmp(prevBankMode, actuatorSettings->BankMode, sizeof(prevBankMode)) != 0);
     bool updateFreq = force_update || (memcmp(prevBankUpdateFreq, actuatorSettings->BankUpdateFreq, sizeof(prevBankUpdateFreq)) != 0);
 
@@ -781,9 +787,9 @@ static void actuator_update_rate_if_changed(const ActuatorSettingsData *actuator
     if (updateMode || updateFreq) {
         /* Something has changed, apply the settings to HW */
 
-        uint16_t freq[ACTUATORSETTINGS_BANKUPDATEFREQ_NUMELEM];
-        uint32_t clock[ACTUATORSETTINGS_BANKUPDATEFREQ_NUMELEM] = { 0 };
-        for (uint8_t i = 0; i < ACTUATORSETTINGS_BANKMODE_NUMELEM; i++) {
+        uint16_t freq[MAX_BANKS];
+        uint32_t clock[MAX_BANKS] = { 0 };
+        for (uint8_t i = 0; i < MAX_BANKS; i++) {
             if (force_update || (actuatorSettings->BankMode[i] != prevBankMode[i])) {
                 PIOS_Servo_SetBankMode(i,
                                        actuatorSettings->BankMode[i] ==
@@ -812,7 +818,7 @@ static void actuator_update_rate_if_changed(const ActuatorSettingsData *actuator
                actuatorSettings->BankMode,
                sizeof(prevBankMode));
 
-        PIOS_Servo_SetHz(freq, clock, ACTUATORSETTINGS_BANKUPDATEFREQ_NUMELEM);
+        PIOS_Servo_SetHz(freq, clock, MAX_BANKS);
 
         memcpy(prevBankUpdateFreq,
                actuatorSettings->BankUpdateFreq,
